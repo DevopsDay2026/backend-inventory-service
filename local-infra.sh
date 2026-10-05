@@ -7,6 +7,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1
 
 POSTGRES_POD="local-postgres"
+# 5433 en el host: 5432 suele estar ocupado por un PostgreSQL instalado en la máquina.
+POSTGRES_HOST_PORT=5433
 KAFKA_POD="local-kafka"
 POSTGRES_IMAGE="docker.io/library/postgres:16-alpine"
 KAFKA_IMAGE="docker.io/apache/kafka:3.9.0"
@@ -33,13 +35,13 @@ postgres_up() {
   else
     : "${DB_USERNAME:?define DB_USERNAME en run.sh}"
     : "${DB_PASSWORD:?define DB_PASSWORD en run.sh}"
-    podman pod create --name "$POSTGRES_POD" -p 5432:5432 >/dev/null
+    podman pod create --name "$POSTGRES_POD" -p "$POSTGRES_HOST_PORT:5432" >/dev/null
     POSTGRES_USER="$DB_USERNAME" POSTGRES_PASSWORD="$DB_PASSWORD" \
       podman run -d --pod "$POSTGRES_POD" --name "$POSTGRES_POD-db" \
       -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB=postgres \
       "$POSTGRES_IMAGE" >/dev/null
   fi
-  wait_until "PostgreSQL (localhost:5432)" \
+  wait_until "PostgreSQL (localhost:$POSTGRES_HOST_PORT)" \
     podman exec "$POSTGRES_POD-db" pg_isready -h localhost -d postgres
 }
 

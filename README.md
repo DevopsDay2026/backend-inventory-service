@@ -13,7 +13,7 @@ Java 21 · Quarkus 3.33 LTS · Maven · arquitectura hexagonal · imagen nativa 
 cp run.sh.example run.sh     # 1. run.sh está ignorado por git
 $EDITOR run.sh               # 2. reemplazar los <...> (usuario y contraseña de PostgreSQL, DOCKER_HOST)
 ./run.sh infra               # 3. PostgreSQL y Kafka locales, cada uno en su pod de Podman
-./run.sh dev                 # 4. modo dev contra localhost:5432 y localhost:9092
+./run.sh dev                 # 4. modo dev contra localhost:5433 y localhost:9092
 ```
 
 Requisitos: JDK 21 y Podman (`podman machine start` en macOS y Windows). No se instala GraalVM ni
@@ -34,17 +34,16 @@ en `/q/metrics`.
 
 | Pod | Imagen | Puerto | Notas |
 |---|---|---|---|
-| `local-postgres` | `postgres:16-alpine` | 5432 | base `postgres`; usuario y contraseña salen de `DB_USERNAME` y `DB_PASSWORD` de `run.sh` |
+| `local-postgres` | `postgres:16-alpine` | 5433 | base `postgres`; usuario y contraseña salen de `DB_USERNAME` y `DB_PASSWORD` de `run.sh` |
 | `local-kafka` | `apache/kafka:3.9.0` (KRaft) | 9092 | anuncia `localhost:9092`; crea los tópicos al primer uso |
 
 `./run.sh infra down` los elimina (los datos no se conservan) y `./run.sh infra status` los lista.
 Los modos `dev`, `jvm` y `native` usan los mismos valores de `run.sh`.
 
-En Windows los pods viven en la máquina WSL de Podman. Kafka se alcanza en `localhost:9092` desde
-Windows y desde cualquier distribución WSL. El puerto 5432 del pod solo se ve desde WSL si en
-Windows ya hay un PostgreSQL instalado escuchando en 5432: en ese caso `./run.sh dev` (Windows) usa
-el PostgreSQL de Windows y `./run.sh native` (WSL) usa el pod, cada uno con su propia base y con el
-mismo usuario y contraseña de `run.sh`.
+En Windows los pods viven en la máquina WSL de Podman. PostgreSQL (`localhost:5433`) y Kafka
+(`localhost:9092`) se alcanzan igual desde Windows y desde cualquier distribución WSL, así que
+`./run.sh dev` y `./run.sh native` usan la misma base y el mismo Kafka. El pod publica 5433 y no
+5432 para no chocar con un PostgreSQL instalado en Windows.
 
 Los pods son los mismos para `backend-orders-service` y `backend-inventory-service`: basta con
 levantarlos desde uno de los dos repositorios y usar el mismo usuario y contraseña en ambos `run.sh`.
@@ -160,7 +159,7 @@ En Windows el binario también corre en una distribución WSL, contra los pods d
 ```
 
 Desde Git Bash `run.sh` pasa las variables a WSL con `WSLENV`; `WSL_DISTRO=<nombre>` elige otra
-distribución. Dentro de WSL los pods de Podman están en `localhost` (5432 y 9092); la IP de Windows
+distribución. Dentro de WSL los pods de Podman están en `localhost` (5433 y 9092); la IP de Windows
 no sirve porque el firewall no expone esos puertos a WSL.
 
 `curl localhost:8081/...` responde tanto desde WSL como desde Windows.

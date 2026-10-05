@@ -6,7 +6,7 @@ set -euo pipefail
 # --- obligatorias en dev | jvm | native | podman (los tests usan Dev Services) ---
 # "infra" crea el pod de PostgreSQL con este usuario y esta contraseña.
 # orders e inventory comparten base y Kafka: usar los mismos valores en los dos run.sh.
-export DB_URL="jdbc:postgresql://localhost:5432/postgres"
+export DB_URL="jdbc:postgresql://localhost:5433/postgres"
 export DB_USERNAME="<usuario-postgres-local>"
 export DB_PASSWORD="<password-postgres-local>"
 export KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
