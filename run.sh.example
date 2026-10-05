@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Configuración local del servicio. Copiar a run.sh (ignorado por git) y reemplazar los <...>.
+# Nunca se commitea un run.sh con valores reales.
+set -euo pipefail
+
+# --- obligatorias en dev | jvm | native | podman (los tests usan Dev Services) ---
+# "infra" crea el pod de PostgreSQL con este usuario y esta contraseña.
+# orders e inventory comparten base y Kafka: usar los mismos valores en los dos run.sh.
+export DB_URL="jdbc:postgresql://localhost:5432/postgres"
+export DB_USERNAME="<usuario-postgres-local>"
+export DB_PASSWORD="<password-postgres-local>"
+export KAFKA_BOOTSTRAP_SERVERS="localhost:9092"
+
+# --- opcionales (valores por defecto entre paréntesis) ---
+# export KAFKA_SECURITY_PROTOCOL="SASL_SSL"          # (PLAINTEXT)
+# export KAFKA_SASL_MECHANISM="SCRAM-SHA-512"        # (PLAIN)
+# export KAFKA_SASL_JAAS_CONFIG="<jaas-config>"      # (vacío) secreto
+# export ORDERS_PLACED_TOPIC="orders.placed"
+# export INVENTORY_RESERVED_TOPIC="inventory.reserved"
+# export INVENTORY_REJECTED_TOPIC="inventory.rejected"
+# export OUTBOX_POLL_INTERVAL="1s"
+# export OUTBOX_BATCH_SIZE="100"
+# export HTTP_PORT="8081"
+# export DB_SCHEMA="inventory"
+# export DB_POOL_MAX="16"
+# export LOG_LEVEL="INFO"
+export LOG_JSON="false"
+
+# --- Dev Services (solo tests) sobre Podman, no Docker ---
+#   Linux:   unix:///run/user/$UID/podman/podman.sock
+#   macOS:   unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')
+#   Windows: npipe:////./pipe/podman-machine-default
+export DOCKER_HOST="<socket-de-podman>"
+export TESTCONTAINERS_RYUK_DISABLED="true"
+
+PASS_THROUGH=(DB_URL DB_USERNAME DB_PASSWORD DB_SCHEMA DB_POOL_MAX KAFKA_BOOTSTRAP_SERVERS
+  KAFKA_SECURITY_PROTOCOL KAFKA_SASL_MECHANISM KAFKA_SASL_JAAS_CONFIG ORDERS_PLACED_TOPIC
+  INVENTORY_RESERVED_TOPIC INVENTORY_REJECTED_TOPIC OUTBOX_POLL_INTERVAL OUTBOX_BATCH_SIZE
+  HTTP_PORT LOG_JSON LOG_LEVEL)
+
+MODE="${1:-dev}"
+case "$MODE" in
+  infra)
+    exec ./local-infra.sh "${2:-up}"
+    ;;
+  dev)
+    exec ./mvnw quarkus:dev
+    ;;
+  jvm)
+    exec java -jar target/quarkus-app/quarkus-run.jar
+    ;;
+  native)
+    case "$(uname -s)" in
+      MINGW* | MSYS*)
+        # El binario es Linux: desde Git Bash corre en WSL, donde los pods de Podman están en localhost.
+        forwarded=()
+        for name in "${PASS_THROUGH[@]}"; do
+          if [[ -n "${!name:-}" ]]; then
+            forwarded+=("$name")
+          fi
+        done
+        WSLENV="${WSLENV:+$WSLENV:}$(IFS=:; echo "${forwarded[*]}")"
+        export WSLENV
+        exec wsl ${WSL_DISTRO:+-d "$WSL_DISTRO"} -- ./target/*-runner
+        ;;
+    esac
+    exec ./target/*-runner
+    ;;
+  podman)
+    env_flags=()
+    for name in "${PASS_THROUGH[@]}"; do
+      if [[ -n "${!name:-}" ]]; then
+        env_flags+=(-e "$name")
+      fi
+    done
+    exec podman run --rm -p 8081:8081 "${env_flags[@]}" "${IMAGE:?define IMAGE, p. ej. localhost/inventory-service:dev}"
+    ;;
+  *)
+    echo "uso: $0 {infra [up|down|status]|dev|jvm|native|podman}" >&2
+    exit 64
+    ;;
+esac

@@ -1,0 +1,17 @@
+# secretos y configuración local
+run.sh
+.env
+.env.*
+*.pem
+*.p12
+*.tfvars
+
+# build
+target/
+.terraform/
+
+# IDE / SO
+.idea/
+.vscode/
+*.iml
+.DS_Store
